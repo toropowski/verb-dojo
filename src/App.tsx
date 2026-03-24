@@ -17,7 +17,7 @@ function ThemeInit() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/verb-dojo">
       <ThemeInit />
       <Routes>
         <Route element={<AppShell />}>
