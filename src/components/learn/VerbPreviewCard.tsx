@@ -1,5 +1,5 @@
 // src/components/learn/VerbPreviewCard.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Verb } from '../../types/verb';
 import type { FormStage } from '../../types/drill';
@@ -69,6 +69,17 @@ export function VerbPreviewCard({
 }: Props) {
   const [direction, setDirection] = useState(1);
   const formRows = getFormRows(verb, formStage);
+
+  // Arrow key navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); handleNext(); }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); handlePrev(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [index, isLast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleNext() {
     setDirection(1);

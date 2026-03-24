@@ -21,7 +21,7 @@ export function Learn() {
 
   const {
     phase, session, currentQuestion,
-    showAnswer, lastCorrect, lastUserAnswer, hint, accuracy, progressPct,
+    showAnswer, lastCorrect, lastUserAnswer, hint, hintMaxed, accuracy, progressPct,
     startDrill, advanceFromIntro, nextVerbPreview, prevVerbPreview,
     submitTypedAnswer, submitMCAnswer, nextQuestion, revealHint, skipQuestion, resetDrill,
   } = useDrill();
@@ -56,12 +56,23 @@ export function Learn() {
     };
   }, [phase, showAnswer, lastCorrect, session?.currentIndex]);
 
-  // Keyboard shortcuts: 1-4 for difficulty when answer wrong
+  // Keyboard shortcuts when answer is showing
   useEffect(() => {
-    if (!showAnswer || lastCorrect || phase !== 'drilling') return;
+    if (!showAnswer || phase !== 'drilling') return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (['1', '2', '3', '4'].includes(e.key)) { e.preventDefault(); handleNext(); }
+      // 1-4: advance on wrong answer (difficulty rating)
+      if (!lastCorrect && ['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        handleNext();
+      }
+      // Enter or Space: skip auto-advance on correct answer immediately
+      if (lastCorrect && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        if (autoRef.current) clearTimeout(autoRef.current);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        handleNext();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -216,7 +227,9 @@ export function Learn() {
                 />
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={skipQuestion}>Skip</Button>
-                  <Button variant="secondary" size="sm" onClick={revealHint} disabled={!!hint}>Hint</Button>
+                  <Button variant="secondary" size="sm" onClick={revealHint} disabled={hintMaxed}>
+                    {hint ? 'More hint' : 'Hint'}
+                  </Button>
                   <Button
                     variant="primary"
                     fullWidth
@@ -257,6 +270,7 @@ export function Learn() {
     const correct = answers.filter(a => a.correct).length;
     const packProg = drillProgress[config.packId];
     const newNotifications = packProg?.pendingUnlockNotifications ?? [];
+    const missedVerbIds = [...new Set(answers.filter(a => !a.correct).map(a => a.verbId))];
 
     return (
       <DrillSummary
@@ -266,9 +280,20 @@ export function Learn() {
         formStage={config.formStage}
         packId={config.packId}
         newUnlocks={newNotifications}
+        missedVerbIds={missedVerbIds}
         onClearNotifications={() => clearUnlockNotifications(config.packId)}
         onHome={() => navigate('/')}
         onContinue={resetDrill}
+        onRetryMissed={missedVerbIds.length > 0 ? () => {
+          if (newNotifications.length > 0) clearUnlockNotifications(config.packId);
+          startDrill({
+            packId: config.packId,
+            verbIds: missedVerbIds.slice(0, 5),
+            formStage: config.formStage,
+            isFirstIntroduction: false,
+            drillIndex: config.drillIndex + 1,
+          });
+        } : undefined}
       />
     );
   }
@@ -391,17 +416,28 @@ function DrillSetupScreen({
                         <div className="bg-green-50 dark:bg-green-900/20 rounded-[10px] px-3 py-2 text-[12px] text-[var(--color-success)] font-medium text-center">
                           ✓ All forms mastered in this pack!
                         </div>
-                      ) : nextDrill ? (
-                        <Button
-                          variant="primary"
-                          fullWidth
-                          onClick={() => onStartDrill(nextDrill)}
-                        >
-                          {nextDrill.isFirstIntroduction
-                            ? `Introduce ${nextDrill.verbIds.length} new verbs — ${STAGE_LABELS[nextDrill.formStage]} form`
-                            : `Review drill — ${STAGE_LABELS[nextDrill.formStage]} form`}
-                        </Button>
-                      ) : null}
+                      ) : nextDrill ? (() => {
+                        const qCount = nextDrill.isFirstIntroduction
+                          ? nextDrill.verbIds.length * 4
+                          : nextDrill.verbIds.length * 3;
+                        const estMins = Math.max(1, Math.round(qCount * 15 / 60));
+                        return (
+                          <div className="space-y-1">
+                            <Button
+                              variant="primary"
+                              fullWidth
+                              onClick={() => onStartDrill(nextDrill)}
+                            >
+                              {nextDrill.isFirstIntroduction
+                                ? `Introduce ${nextDrill.verbIds.length} new verbs — ${STAGE_LABELS[nextDrill.formStage]} form`
+                                : `Review drill — ${STAGE_LABELS[nextDrill.formStage]} form`}
+                            </Button>
+                            <p className="text-[11px] text-center text-[var(--color-text3)]">
+                              {qCount} questions · ~{estMins} min
+                            </p>
+                          </div>
+                        );
+                      })() : null}
                     </>
                   )}
 
@@ -436,16 +472,18 @@ type DrillSummaryProps = {
   formStage: import('../types/drill').FormStage;
   packId: string;
   newUnlocks: import('../types/drill').FormStage[];
+  missedVerbIds: string[];
   onClearNotifications: () => void;
   onHome: () => void;
   onContinue: () => void;
+  onRetryMissed?: () => void;
 };
 
 const FORM_NAMES: Record<string, string> = {
   masu: 'ます form', te: 'て form', negative: 'ない form', recall: 'Recall',
 };
 
-function DrillSummary({ accuracy, correct, total, formStage, packId, newUnlocks, onClearNotifications, onHome, onContinue }: DrillSummaryProps) {
+function DrillSummary({ accuracy, correct, total, formStage, packId, newUnlocks, missedVerbIds, onClearNotifications, onHome, onContinue, onRetryMissed }: DrillSummaryProps) {
   const pack = PACK_MAP.get(packId);
 
   const handleContinue = () => {
@@ -489,6 +527,19 @@ function DrillSummary({ accuracy, correct, total, formStage, packId, newUnlocks,
               {FORM_NAMES[stage]} is now available for {pack?.name}
             </p>
           ))}
+        </motion.div>
+      )}
+
+      {onRetryMissed && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4 }}
+          className="px-2"
+        >
+          <Button variant="secondary" fullWidth onClick={onRetryMissed}>
+            🔄 Practice {missedVerbIds.length} missed verb{missedVerbIds.length !== 1 ? 's' : ''}
+          </Button>
         </motion.div>
       )}
 

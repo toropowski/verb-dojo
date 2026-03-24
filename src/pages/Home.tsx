@@ -118,18 +118,20 @@ export function Home() {
   const navigate = useNavigate();
   const { initCards, cards, getDueCards, getNewCards, streak, getTodayStats,
           getTotalMastered, getOverallAccuracy, dailyStats, isPackUnlocked, getPackProgress,
-          lastStudyDate } = useProgressStore();
-  const { theme, toggleTheme } = useSettingsStore();
+          lastStudyDate, getLeeches } = useProgressStore();
+  const { theme, toggleTheme, dailyNewLimit } = useSettingsStore();
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const streakAtRisk = streak > 1 && lastStudyDate !== todayStr();
+  const leeches = getLeeches();
 
   useEffect(() => { initCards(); }, [initCards]);
 
   const dueCount     = getDueCards().length;
   const newCount     = getNewCards(5).length;
   const todayStats   = getTodayStats();
+  const goalPct      = Math.min(100, Math.round((todayStats.reviewed / Math.max(dailyNewLimit, 1)) * 100));
   const totalMastered = getTotalMastered();
   const totalCards   = VERBS.length * 2;
   const masteryPercent = Math.round((totalMastered / totalCards) * 100);
@@ -210,6 +212,40 @@ export function Home() {
           {newCount > 0 && <span className="text-[12px] text-[var(--color-success)]">{newCount} new</span>}
           {dueCount + newCount === 0 && <span className="text-[12px] text-[var(--color-success)]">All caught up! ✓</span>}
         </div>
+
+        {/* Daily goal progress */}
+        <div className="bg-[var(--color-surface)] rounded-[12px] px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[12px] text-[var(--color-text3)]">Daily goal</span>
+            <span className="text-[12px] font-semibold text-[var(--color-text2)]">
+              {todayStats.reviewed} / {dailyNewLimit} {goalPct >= 100 ? '🎉' : ''}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-[var(--color-surface2)] rounded-full overflow-hidden">
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: goalPct >= 100 ? 'var(--color-success)' : 'var(--color-accent)' }}
+              initial={{ width: 0 }}
+              animate={{ width: `${goalPct}%` }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+            />
+          </div>
+        </div>
+
+        {/* Tricky verbs chip */}
+        {leeches.length > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={() => navigate('/learn')}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[12px] bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 hover:opacity-80 transition-opacity"
+          >
+            <span className="text-[14px]">⚠️</span>
+            <span className="text-[13px] font-medium text-red-700 dark:text-red-300">
+              {leeches.length} tricky verb{leeches.length !== 1 ? 's' : ''} need extra practice
+            </span>
+          </motion.button>
+        )}
       </div>
 
       {/* How it works */}

@@ -1,4 +1,5 @@
 // src/components/quiz/MultipleChoiceCard.tsx
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { DrillQuestion } from '../../types/drill';
 import { FuriganaText } from '../verb/FuriganaText';
@@ -12,6 +13,7 @@ type Props = {
 };
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
+const KEY_MAP: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
 
 function getPromptLabel(question: DrillQuestion): string {
   switch (question.exerciseType) {
@@ -29,9 +31,7 @@ function getPromptLabel(question: DrillQuestion): string {
 }
 
 function resolveFormLabel(question: DrillQuestion): { formStage: string } {
-  // Infer a friendly form name from the mcOptionType or the question context
   if (question.mcOptionType === 'form') {
-    // Detect by correctAnswer pattern — best-effort heuristic for the label
     const ca = question.correctAnswer;
     if (ca.endsWith('ます') || ca.endsWith('ません')) return { formStage: 'ます' };
     if (ca.endsWith('て') || ca.endsWith('で')) return { formStage: 'て' };
@@ -110,8 +110,22 @@ export function MultipleChoiceCard({
   const isFormType = mcOptionType === 'form';
   const promptLabel = getPromptLabel(question);
 
+  // A/B/C/D keyboard shortcuts
+  useEffect(() => {
+    if (showResult) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = KEY_MAP[e.key.toLowerCase()];
+      if (idx !== undefined && mcOptions[idx] !== undefined) {
+        e.preventDefault();
+        onSelect(mcOptions[idx]);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showResult, mcOptions, onSelect]);
+
   // Decide whether to show options in 2×2 grid or stacked
-  // Heuristic: if any option is longer than 12 chars, stack them
   const useStack = mcOptions.some((o) => o.length > 14);
 
   return (
@@ -194,6 +208,13 @@ export function MultipleChoiceCard({
         <p className="text-center text-[15px] font-semibold text-[var(--color-text1)]">
           {promptLabel}
         </p>
+
+        {/* Keyboard hint */}
+        {!showResult && (
+          <p className="text-center text-[11px] text-[var(--color-text3)]">
+            Press A · B · C · D to select
+          </p>
+        )}
       </div>
 
       {/* Divider */}
@@ -215,6 +236,9 @@ export function MultipleChoiceCard({
               <motion.button
                 key={option}
                 whileTap={!showResult ? { scale: 0.97 } : {}}
+                // Shake the wrong option when result is shown
+                animate={state === 'wrong' ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
+                transition={{ duration: 0.35 }}
                 onClick={() => !showResult && onSelect(option)}
                 disabled={showResult}
                 className={[

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VERBS } from '../data/verbs';
 import { VerbBadge } from '../components/verb/VerbBadge';
+import { useProgressStore } from '../store/useProgressStore';
 import type { VerbGroup } from '../types/verb';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11,6 +12,7 @@ function VerbsTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<VerbGroup | 0>(0);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { verbMastery } = useProgressStore();
 
   const filtered = VERBS.filter(v => {
     if (filter !== 0 && v.group !== filter) return false;
@@ -53,7 +55,18 @@ function VerbsTab() {
       <p className="text-[12px] text-[var(--color-text3)]">{filtered.length} verbs</p>
 
       <div className="space-y-1">
-        {filtered.map(verb => (
+        {filtered.map(verb => {
+          const vm = verbMastery[`${verb.id}:masu`];
+          const isMastered = !!vm?.masteredAt;
+          const isSeen = !!vm?.firstSeenAt;
+          const dotColor = isMastered
+            ? 'bg-[var(--color-success)]'
+            : isSeen
+            ? 'bg-amber-400'
+            : 'bg-[var(--color-surface2)]';
+          const dotTitle = isMastered ? 'Mastered' : isSeen ? 'In progress' : 'Not started';
+
+          return (
           <div key={verb.id} className="bg-[var(--color-surface)] rounded-[14px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
             <button
               className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -63,6 +76,10 @@ function VerbsTab() {
                 <VerbBadge group={verb.group} />
                 <span className="font-jp font-bold text-[17px]">{verb.dictionaryForm.kanji}</span>
                 <span className="text-[var(--color-text3)] text-[12px]">{verb.dictionaryForm.romaji}</span>
+                <span
+                  title={dotTitle}
+                  className={['w-2 h-2 rounded-full shrink-0 border border-white/50', dotColor].join(' ')}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[var(--color-text2)] text-[13px]">{verb.meaning}</span>
@@ -109,7 +126,8 @@ function VerbsTab() {
               )}
             </AnimatePresence>
           </div>
-        ))}
+          );
+        })}
         {filtered.length === 0 && <p className="text-[var(--color-text3)] text-center py-8">No verbs found</p>}
       </div>
     </div>

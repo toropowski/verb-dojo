@@ -20,6 +20,7 @@ export function useDrill() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [lastUserAnswer, setLastUserAnswer] = useState('');
   const [hint, setHint] = useState('');
+  const [hintLevel, setHintLevel] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
   const phase: DrillPhase = session?.phase ?? 'idle';
@@ -52,6 +53,7 @@ export function useDrill() {
     setShowAnswer(false);
     setLastUserAnswer('');
     setHint('');
+    setHintLevel(0);
     startTimeRef.current = Date.now();
   }, [drillProgress]);
 
@@ -139,6 +141,7 @@ export function useDrill() {
     setShowAnswer(false);
     setLastUserAnswer('');
     setHint('');
+    setHintLevel(0);
 
     const nextIndex = session.currentIndex + 1;
     if (nextIndex >= session.questions.length) {
@@ -153,7 +156,12 @@ export function useDrill() {
 
   const revealHint = useCallback(() => {
     if (!currentQuestion) return;
-    setHint(currentQuestion.correctAnswer[0] ?? '');
+    const answer = currentQuestion.correctAnswer;
+    setHintLevel(prev => {
+      const next = Math.min(prev + 1, answer.length - 1);
+      setHint(answer.slice(0, next));
+      return next;
+    });
   }, [currentQuestion]);
 
   const skipQuestion = useCallback(() => {
@@ -163,6 +171,7 @@ export function useDrill() {
     setLastUserAnswer('');
     setShowAnswer(true);
     setHint('');
+    setHintLevel(0);
 
     if (currentQuestion.exerciseType === 'type-dict-to-masu') {
       submitAnswer(currentQuestion.verb.id, 'dictionary', false, responseTimeMs);
@@ -185,6 +194,7 @@ export function useDrill() {
     setShowAnswer(false);
     setLastUserAnswer('');
     setHint('');
+    setHintLevel(0);
     setLastCorrect(false);
   }, []);
 
@@ -196,6 +206,10 @@ export function useDrill() {
     ? ((session.currentIndex + (showAnswer ? 1 : 0)) / session.questions.length) * 100
     : 0;
 
+  const hintMaxed = currentQuestion
+    ? hintLevel >= currentQuestion.correctAnswer.length - 1
+    : false;
+
   return {
     // State
     phase,
@@ -205,6 +219,7 @@ export function useDrill() {
     lastCorrect,
     lastUserAnswer,
     hint,
+    hintMaxed,
     accuracy,
     progressPct,
     // Actions

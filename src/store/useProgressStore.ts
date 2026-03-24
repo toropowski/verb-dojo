@@ -124,6 +124,7 @@ type ProgressState = {
   getPackMasuMasteryPercent: (packId: string) => number;
   clearUnlockNotifications: (packId: string) => void;
   getVerbMastery: (verbId: string, form: FormStage) => VerbMastery;
+  getLeeches: () => string[];  // verbIds that are consistently wrong
 };
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -508,6 +509,18 @@ export const useProgressStore = create<ProgressState>()(
             },
           };
         });
+      },
+
+      getLeeches: (): string[] => {
+        const leeches: string[] = [];
+        for (const card of Object.values(get().cards)) {
+          if (card.form !== 'dictionary') continue;
+          if (card.history.length < 4) continue;
+          const recent = card.history.slice(-4);
+          const wrongCount = recent.filter(r => !r.correct).length;
+          if (wrongCount >= 3) leeches.push(card.verbId);
+        }
+        return leeches;
       },
     }),
     {
