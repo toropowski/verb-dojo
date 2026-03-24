@@ -63,7 +63,7 @@ function MasteryBar({ level }: { level: MasteryLevel }) {
 // ── Packs tab ───────────────────────────────────────────────────────────────
 
 function PacksTab() {
-  const { isPackUnlocked, getPackProgress, cards } = useProgressStore();
+  const { isPackUnlocked, getPackProgress, getPackMasuMasteryPercent, getFormMasteryCount, getFormStages, cards } = useProgressStore();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
@@ -71,7 +71,9 @@ function PacksTab() {
       {VERB_PACKS.map((pack, i) => {
         const unlocked = isPackUnlocked(pack.id);
         const progress = getPackProgress(pack.id);
-        const pct = Math.round((progress.learned / progress.total) * 100);
+        const masuPct = unlocked ? getPackMasuMasteryPercent(pack.id) : 0;
+        const pct = masuPct;
+        const stages = unlocked ? getFormStages(pack.id) : ['masu'];
         const isOpen = expanded === pack.id;
 
         // Per-verb mastery for expanded view
@@ -113,12 +115,33 @@ function PacksTab() {
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   {unlocked ? (
-                    <p className="text-[11px] text-[var(--color-text3)]">
-                      {progress.learned} learned · {progress.mastered} mastered · {progress.total} total
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-[var(--color-text3)]">
+                        {progress.mastered}/{progress.total} ます mastered · {pct}% toward next pack unlock
+                      </p>
+                      <div className="flex gap-1 flex-wrap">
+                        {(['masu', 'te', 'negative', 'recall'] as const).map(stage => {
+                          const isUnlocked = (stages as string[]).includes(stage);
+                          const count = getFormMasteryCount(pack.id, stage);
+                          return (
+                            <span key={stage}
+                              className={[
+                                'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                                isUnlocked
+                                  ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
+                                  : 'bg-[var(--color-surface2)] text-[var(--color-text3)]',
+                              ].join(' ')}
+                            >
+                              {stage === 'masu' ? 'ます' : stage === 'te' ? 'て' : stage === 'negative' ? 'ない' : '💭'}
+                              {isUnlocked ? ` ${count.mastered}/${count.total}` : ' 🔒'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ) : pack.unlocksAfter ? (
                     <p className="text-[11px] text-[var(--color-warning)]">
-                      🔒 Learn {pack.unlocksAfter.minLearned} verbs from previous pack to unlock
+                      🔒 Master 80% ます form of previous pack to unlock
                     </p>
                   ) : (
                     <p className="text-[11px] text-[var(--color-text3)]">Complete previous pack to unlock</p>

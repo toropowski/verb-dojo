@@ -213,7 +213,7 @@ export function SessionSetup({ dueCount, newCount, onStart }: Props) {
                     )}
                     {!unlocked && pack.unlocksAfter && (
                       <p className="text-[10px] text-[var(--color-text3)] text-right">
-                        Learn {pack.unlocksAfter.minLearned} from<br />prev pack
+                        Master 80% of prev pack to unlock
                       </p>
                     )}
                   </button>

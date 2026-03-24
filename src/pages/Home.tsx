@@ -107,7 +107,7 @@ function PackCard({ pack, unlocked, progress }: {
         {unlocked
           ? `${progress.learned} learned · ${progress.mastered} mastered`
           : pack.unlocksAfter
-            ? `Learn ${pack.unlocksAfter.minLearned} verbs from previous pack`
+            ? `Master 80% ます of previous pack to unlock`
             : 'Complete previous pack to unlock'}
       </p>
     </div>
